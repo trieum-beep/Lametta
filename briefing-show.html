@@ -153,6 +153,15 @@ const MUSIC = (() => {
   const hz = n => { if (!n || n === '-') return 0; const m = n.match(/^([A-G]#?)(\d)$/); return 440 * Math.pow(2, (NOTE[m[1]] + (+m[2] + 1) * 12 - 69) / 12); };
   const seq = s => s.trim().split(/\s+/).map(x => { const [n, l] = x.split(':'); return [n, +(l || 1)]; });
   const SONGS = {
+
+    // Stille Nacht (Franz Xaver Gruber, 1818, gemeinfrei) als ruhige Spieluhr, 6/8 in Achteln
+    stille: { dt: .24, box: true, mel: seq(`G5:3 A5:1 G5:2 E5:6 G5:3 A5:1 G5:2 E5:6 D6:4 D6:2 B5:6 C6:4 C6:2 G5:6
+                                    A5:4 A5:2 C6:3 B5:1 A5:2 G5:3 A5:1 G5:2 E5:6 A5:4 A5:2 C6:3 B5:1 A5:2 G5:3 A5:1 G5:2 E5:6
+                                    D6:4 D6:2 F6:3 D6:1 B5:2 C6:6 E6:6 C6:3 G5:1 E5:2 G5:3 F5:1 D5:2 C5:12`),
+      bass: seq(`C3:6 C3:6 C3:6 C3:6 G2:6 G2:6 C3:6 C3:6 F2:6 F2:6 C3:6 C3:6 F2:6 F2:6 C3:6 C3:6 G2:6 G2:6 C3:6 C3:6 C3:6 G2:6 C3:6 C3:6`) },
+    // We Wish You a Merry Christmas (traditionell, gemeinfrei), festlich und weich, 3/4 in Achteln
+    wish: { dt: .17, box: true, mel: seq(`G4:2 C5:2 C5 D5 C5 B4 A4:2 A4:2 A4:2 D5:2 D5 E5 D5 C5 B4:2 G4:2 G4:2 E5:2 E5 F5 E5 D5 C5:2 A4:2 G4 G4 A4:2 D5:2 B4:2 C5:4`),
+      bass: seq(`-:2 C3:6 F2:6 D3:6 G2:6 E3:6 F2:6 G2:6 C3:4`) },
     // Jingle Bells (gemeinfrei), Achtelschritte
     jingle: { dt: .19, mel: seq(`E5:2 E5:2 E5:4 E5:2 E5:2 E5:4 E5:2 G5:2 C5:3 D5:1 E5:8 F5:2 F5:2 F5:3 F5:1 F5:2 E5:2 E5:2 E5:1 E5:1 E5:2 D5:2 D5:2 E5:2 D5:4 G5:4
                                  E5:2 E5:2 E5:4 E5:2 E5:2 E5:4 E5:2 G5:2 C5:3 D5:1 E5:8 F5:2 F5:2 F5:3 F5:1 F5:2 E5:2 E5:2 E5:1 E5:1 G5:2 G5:2 F5:2 D5:2 C5:8`),
@@ -171,18 +180,24 @@ const MUSIC = (() => {
   // Dramatisches Finale (eigene Komposition): Aufstieg, Halteton, Schlussakkord
   const FINALE = { dt: .16, mel: seq(`G4 C5 E5 G5 C6:4 -:2 A5 G5 E5 C6:4 -:2 D5 F5 A5 D6:4 C6 B5 A5 B5:4 G5:2 C6:12`),
     bass: seq(`C3:4 E3:4 G3:6 F3:4 A3:4 F3:6 D3:4 F3:4 G3:6 G2:8 C3:12`) };
-  let ac = null, master = null, timer = null, song = null, ev = null, step = 0, nextT = 0, base = .32;
+  let ac = null, master = null, timer = null, song = null, ev = null, step = 0, nextT = 0, base = .22;
   const ctx = () => { if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); master = ac.createGain(); master.gain.value = base; master.connect(ac.destination); } catch (e) { return null; } }
     if (ac.state === 'suspended') ac.resume(); return ac; };
   function tone(f, t, d, type, v) { if (!f) return; const o = ac.createOscillator(), g = ac.createGain(); o.type = type; o.frequency.value = f;
     g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v, t + .01); g.gain.setValueAtTime(v, t + d * .7); g.gain.exponentialRampToValueAtTime(.0005, t + d); o.connect(g).connect(master); o.start(t); o.stop(t + d + .02); }
+  // Spieluhr: kurzer Anschlag, langes Ausklingen, Sinus
+  function pluck(f, t, d, v) { const o = ac.createOscillator(), g = ac.createGain(); o.type = 'sine'; o.frequency.value = f;
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v, t + .005); g.gain.exponentialRampToValueAtTime(.0005, t + d); o.connect(g).connect(master); o.start(t); o.stop(t + d + .02); }
   function hat(t, v) { const b = ac.createBuffer(1, ac.sampleRate * .04, ac.sampleRate), x = b.getChannelData(0); for (let i = 0; i < x.length; i++) x[i] = (Math.random() * 2 - 1) * (1 - i / x.length);
     const s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain(); f.type = 'highpass'; f.frequency.value = 7000; g.gain.value = v; s.buffer = b; s.connect(f).connect(g).connect(master); s.start(t); }
   function events(sg) { const m = new Map(), add = (track, k) => { let s = 0; sg[track].forEach(([n, l]) => { if (n !== '-') { const a = m.get(s) || []; a.push([k, hz(n), l]); m.set(s, a); } s += l; }); return s; };
     const len = Math.max(add('mel', 'm'), add('bass', 'b')); return { m, len }; }
   function tick() {
     while (nextT < ac.currentTime + .25) {
-      (ev.m.get(step) || []).forEach(([k, f, l]) => k === 'm' ? tone(f, nextT, l * song.dt * .95, song.wave || 'square', .085) : tone(f, nextT, l * song.dt * .9, 'triangle', .16));
+      (ev.m.get(step) || []).forEach(([k, f, l]) => {
+        if (k === 'm') { if (song.box) { pluck(f, nextT, Math.max(.9, l * song.dt * 1.4), .11); pluck(f * 2, nextT, .5, .025); } else tone(f, nextT, l * song.dt * .95, song.wave || 'square', .085); }
+        else tone(f, nextT, l * song.dt * .9, song.box ? 'sine' : 'triangle', song.box ? .12 : .16);
+      });
       if (song.hat && step % song.hat === 0) hat(nextT, .05);
       nextT += song.dt; step = (step + 1) % ev.len;
     }
@@ -193,7 +208,7 @@ const MUSIC = (() => {
     get playing() { return !!timer; },
     duck(f) { if (ac && master) master.gain.setTargetAtTime(base * f, ac.currentTime, .15); },
     finale() { if (!ctx()) return 0; this.stop(); master.gain.setValueAtTime(base * 1.25, ac.currentTime); const e = events(FINALE), t0 = ac.currentTime + .05;
-      e.m.forEach((a, s) => a.forEach(([k, f, l]) => k === 'm' ? (tone(f, t0 + s * FINALE.dt, l * FINALE.dt, 'square', .09), tone(f * 1.5, t0 + s * FINALE.dt, l * FINALE.dt, 'square', .03)) : tone(f, t0 + s * FINALE.dt, l * FINALE.dt, 'triangle', .2)));
+      e.m.forEach((a, s) => a.forEach(([k, f, l]) => k === 'm' ? (tone(f, t0 + s * FINALE.dt, l * FINALE.dt, 'triangle', .14), pluck(f * 2, t0 + s * FINALE.dt, l * FINALE.dt * 1.2, .04)) : tone(f, t0 + s * FINALE.dt, l * FINALE.dt, 'triangle', .2)));
       for (let s = 0; s < e.len; s += 2) hat(t0 + s * FINALE.dt, .07);
       return e.len * FINALE.dt; }
   };
@@ -227,14 +242,14 @@ $('fs').onclick = () => { try { document.fullscreenElement ? document.exitFullsc
 let ac = null, on = false;
 const tone = (f, t, d, type = 'square', v = .08) => { if (!on) return; ac = ac || new (window.AudioContext || window.webkitAudioContext)(); const o = ac.createOscillator(), g = ac.createGain(), s = ac.currentTime + t;
   o.type = type; o.frequency.value = f; g.gain.setValueAtTime(v, s); g.gain.exponentialRampToValueAtTime(.001, s + d); o.connect(g).connect(ac.destination); o.start(s); o.stop(s + d + .05); };
-$('snd').onclick = () => { on = !on; $('snd').textContent = on ? '♪ an' : '♪ aus'; if (on) { tone(988, 0, .1); tone(1319, .1, .3); MUSIC.start('jingle'); } else MUSIC.stop(); };
+$('snd').onclick = () => { on = !on; $('snd').textContent = on ? '♪ an' : '♪ aus'; if (on) { tone(988, 0, .1); tone(1319, .1, .3); MUSIC.start('stille'); } else MUSIC.stop(); };
 // Startampel: fünf rote Lichter, dann grün und los
 $('go').onclick = () => {
   const L = [...$('lights').children], race = $('s4'); $('go').disabled = true; if (on) MUSIC.duck(.15);
   race.classList.remove('racing'); $('lights').classList.remove('go'); L.forEach(x => x.classList.remove('r'));
   L.forEach((x, i) => setTimeout(() => { x.classList.add('r'); tone(440, 0, .25); }, 700 * (i + 1)));
   setTimeout(() => { $('lights').classList.add('go'); L.forEach(x => x.classList.remove('r')); tone(880, 0, .6); [523, 659, 784, 1047].forEach((f, i) => tone(f, .15 + i * .1, .25, 'triangle'));
-    race.classList.remove('idle'); race.classList.add('racing'); if (on) MUSIC.start('tarantella'); }, 700 * 6 + 600);
+    race.classList.remove('idle'); race.classList.add('racing'); if (on) MUSIC.start('wish'); }, 700 * 6 + 600);
   setTimeout(() => { $('go').disabled = false; $('go').textContent = 'Nochmal ▶'; }, 700 * 6 + 6500);
 };
 // leiser Schneefall
