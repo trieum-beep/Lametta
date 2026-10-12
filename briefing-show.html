@@ -217,12 +217,13 @@ const MUSIC = (() => {
 const $ = id => document.getElementById(id);
 const secs = [...document.querySelectorAll('section')];
 // Uhr und Countdown bis zur ersten Startwelle
-const FIRST = '16:40';
+const EVENT = new Date('2026-11-26T16:40:00+01:00');
 function clock() {
   const n = new Date(); $('clk').textContent = n.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-  const [h, m] = FIRST.split(':').map(Number), t = new Date(n); t.setHours(h, m, 0, 0);
-  const d = Math.round((t - n) / 1000);
-  $('soon').textContent = d > 0 && d < 3 * 3600 ? `Start in ${Math.floor(d / 60)}:${String(d % 60).padStart(2, '0')}` : "Gleich geht's los!";
+  const s = Math.floor((EVENT - n) / 1000), p = x => String(x).padStart(2, '0');
+  if (s <= 0) { $('soon').textContent = "Gleich geht's los!"; return; }
+  const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
+  $('soon').textContent = d > 0 ? `Start in ${d} ${d === 1 ? 'Tag' : 'Tagen'} ${p(h)}:${p(m)}:${p(s % 60)}` : `Start in ${p(h)}:${p(m)}:${p(s % 60)}`;
 }
 clock(); setInterval(clock, 1000);
 // Abschnitte einblenden
